@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoadingScreen from '../components/LoadingScreen';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -7,6 +7,7 @@ import Lottie from 'lottie-react';
 import plantAnimation from '../assets/lottie/plant-growth.json';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import confetti from 'canvas-confetti';
 
 export default function DashboardPage({ userData: initialUserData }) {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export default function DashboardPage({ userData: initialUserData }) {
   const [journalInsight, setJournalInsight] = useState('');
   const [isInsightLoading, setIsInsightLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const plantRef = useRef();
+  const prevStreakRef = useRef(initialUserData?.streak || 0);
 
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -160,6 +163,31 @@ export default function DashboardPage({ userData: initialUserData }) {
     }
   };
 
+  // 🌱 Play only the growth segment when streak increases
+  useEffect(() => {
+    if (plantRef.current && streak > prevStreakRef.current) {
+      const totalFrames = plantRef.current.getDuration(true);
+      const framesPerDay = totalFrames / 14;
+      const startFrame = framesPerDay * (streak - 1);
+      const endFrame = framesPerDay * streak;
+
+      plantRef.current.playSegments([startFrame, endFrame], true);
+      prevStreakRef.current = streak;
+
+      if (streak === 14) {
+        confetti({
+          particleCount: 200,
+          spread: 100,
+          origin: { y: 0.6 },
+        });
+        toast.success("Congratulations! Your plant is fully grown! 🌳", {
+          position: "top-center",
+          autoClose: 8000,
+        });
+      }
+    }
+  }, [streak]);
+
   if (loading) return <LoadingScreen text="Loading your dashboard..." />;
   if (!userData?.plan?.length) return null;
   const todayPlan = userData.plan[todayIndex];
@@ -212,9 +240,10 @@ export default function DashboardPage({ userData: initialUserData }) {
       <div className="bg-white p-6 rounded-2xl shadow-xl text-center">
         <h3 className="text-xl font-bold text-stone-800 mb-4">Your Mindful Plant 🌿</h3>
         <Lottie
+          lottieRef={plantRef}
           animationData={plantAnimation}
           loop={false}
-          playSegments={[0, (streak / 14) * 100]}
+          autoplay={false}
           style={{ height: 300 }}
         />
         <p className="mt-2 text-stone-500">Every day you complete your tasks, your plant grows 🌱</p>
